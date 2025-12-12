@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Package, PlusCircle, History, Settings, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { LayoutDashboard, Package, PlusCircle, History, Settings, Trash2, Download, Upload, AlertTriangle } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { InventoryList } from './components/InventoryList';
 import { StockForm } from './components/StockForm';
@@ -50,6 +50,7 @@ const STORAGE_KEYS = {
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView | 'settings'>('dashboard');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Initialize state from LocalStorage or fallback to INITIAL_STOCKS
   const [stocks, setStocks] = useState<StockItem[]>(() => {
@@ -149,6 +150,61 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Backup & Restore Actions ---
+
+  const handleExportData = () => {
+    const data = {
+      stocks,
+      sales,
+      exportDate: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `鞋店管家备份_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = event.target?.result as string;
+        const data = JSON.parse(json);
+
+        if (!data.stocks || !Array.isArray(data.stocks) || !data.sales || !Array.isArray(data.sales)) {
+          alert('文件格式错误：这似乎不是有效的备份文件。');
+          return;
+        }
+
+        if (confirm(`准备导入备份：\n包含 ${data.stocks.length} 个库存商品\n包含 ${data.sales.length} 条销售记录\n\n当前的所有数据将被覆盖，确定吗？`)) {
+          setStocks(data.stocks);
+          setSales(data.sales);
+          alert('数据恢复成功！');
+          // Reset file input so user can select the same file again if needed
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      } catch (err) {
+        console.error("Import failed", err);
+        alert('导入失败：文件可能已损坏。');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // --- Derived Statistics ---
 
   const stats: DashboardStats = useMemo(() => {
@@ -235,11 +291,52 @@ const App: React.FC = () => {
           {view === 'settings' && (
              <div className="pb-20">
                <h1 className="text-2xl font-bold mb-6">应用设置</h1>
+               
+               {/* Data Backup Section */}
+               <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden mb-6">
+                 <div className="p-6">
+                   <h3 className="font-semibold text-lg text-slate-900 mb-2">数据备份与恢复</h3>
+                   <div className="bg-amber-50 p-3 rounded-lg flex items-start gap-3 mb-6">
+                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                     <p className="text-amber-800 text-xs leading-relaxed">
+                       重要提示：数据当前仅保存在您的浏览器中。清除缓存会导致数据丢失。请定期下载备份文件以防意外。
+                     </p>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4">
+                     <button 
+                       onClick={handleExportData}
+                       className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+                     >
+                       <Download className="w-6 h-6 text-indigo-600" />
+                       <span className="text-sm font-medium">下载备份</span>
+                     </button>
+                     
+                     <button 
+                       onClick={handleImportClick}
+                       className="flex flex-col items-center justify-center gap-2 p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+                     >
+                       <Upload className="w-6 h-6 text-indigo-600" />
+                       <span className="text-sm font-medium">导入恢复</span>
+                     </button>
+                     {/* Hidden File Input */}
+                     <input 
+                       ref={fileInputRef}
+                       type="file" 
+                       accept=".json" 
+                       className="hidden" 
+                       onChange={handleFileImport}
+                     />
+                   </div>
+                 </div>
+               </div>
+
+               {/* Danger Zone */}
                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
                  <div className="p-6">
-                   <h3 className="font-semibold text-lg text-slate-900 mb-2">数据管理</h3>
-                   <p className="text-slate-500 text-sm mb-6">
-                     您的数据当前存储在本地浏览器的缓存中。如果您清除浏览器缓存，数据可能会丢失。
+                   <h3 className="font-semibold text-lg text-slate-900 mb-2">危险区域</h3>
+                   <p className="text-slate-500 text-sm mb-4">
+                     重置将清空所有数据并恢复到初始演示状态。
                    </p>
                    
                    <button 
@@ -253,7 +350,7 @@ const App: React.FC = () => {
                </div>
                
                <div className="mt-8 text-center text-xs text-slate-400">
-                 <p>鞋店管家 v1.0.1</p>
+                 <p>鞋店管家 v1.0.2</p>
                  <p className="mt-1">Designed for Small Business</p>
                </div>
              </div>
