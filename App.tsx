@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, Package, PlusCircle, History } from 'lucide-react';
+import { LayoutDashboard, Package, PlusCircle, History, Settings, Trash2 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { InventoryList } from './components/InventoryList';
 import { StockForm } from './components/StockForm';
 import { SaleModal } from './components/SaleModal';
 import { StockItem, SaleRecord, AppView, DashboardStats } from './types';
 
-// Initial data with variants
+// Initial data with variants (Used only if local storage is empty)
 const INITIAL_STOCKS: StockItem[] = [
   {
     id: '1',
@@ -43,14 +43,47 @@ const INITIAL_STOCKS: StockItem[] = [
   }
 ];
 
+const STORAGE_KEYS = {
+  STOCKS: 'shoe-store-stocks',
+  SALES: 'shoe-store-sales'
+};
+
 const App: React.FC = () => {
-  const [view, setView] = useState<AppView>('dashboard');
-  const [stocks, setStocks] = useState<StockItem[]>(INITIAL_STOCKS);
-  const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [view, setView] = useState<AppView | 'settings'>('dashboard');
+  
+  // Initialize state from LocalStorage or fallback to INITIAL_STOCKS
+  const [stocks, setStocks] = useState<StockItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.STOCKS);
+      return saved ? JSON.parse(saved) : INITIAL_STOCKS;
+    } catch (e) {
+      console.error("Failed to load stocks from storage", e);
+      return INITIAL_STOCKS;
+    }
+  });
+
+  const [sales, setSales] = useState<SaleRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SALES);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Failed to load sales from storage", e);
+      return [];
+    }
+  });
   
   // State for Sale Modal
   const [selectedStockForSale, setSelectedStockForSale] = useState<StockItem | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+
+  // --- Persistence Effects ---
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STOCKS, JSON.stringify(stocks));
+  }, [stocks]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(sales));
+  }, [sales]);
 
   // --- Actions ---
 
@@ -103,6 +136,17 @@ const App: React.FC = () => {
 
     setIsSaleModalOpen(false);
     setSelectedStockForSale(null);
+  };
+
+  const handleResetData = () => {
+    if (confirm('确定要清空所有数据吗？此操作无法撤销，数据将恢复到初始测试状态。')) {
+      localStorage.removeItem(STORAGE_KEYS.STOCKS);
+      localStorage.removeItem(STORAGE_KEYS.SALES);
+      setStocks(INITIAL_STOCKS);
+      setSales([]);
+      alert('数据已重置');
+      setView('dashboard');
+    }
   };
 
   // --- Derived Statistics ---
@@ -188,6 +232,32 @@ const App: React.FC = () => {
                )}
              </div>
           )}
+          {view === 'settings' && (
+             <div className="pb-20">
+               <h1 className="text-2xl font-bold mb-6">应用设置</h1>
+               <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                 <div className="p-6">
+                   <h3 className="font-semibold text-lg text-slate-900 mb-2">数据管理</h3>
+                   <p className="text-slate-500 text-sm mb-6">
+                     您的数据当前存储在本地浏览器的缓存中。如果您清除浏览器缓存，数据可能会丢失。
+                   </p>
+                   
+                   <button 
+                     onClick={handleResetData}
+                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-medium hover:bg-red-100 transition-colors"
+                   >
+                     <Trash2 className="w-5 h-5" />
+                     清空所有数据 (重置)
+                   </button>
+                 </div>
+               </div>
+               
+               <div className="mt-8 text-center text-xs text-slate-400">
+                 <p>鞋店管家 v1.0.1</p>
+                 <p className="mt-1">Designed for Small Business</p>
+               </div>
+             </div>
+          )}
         </main>
 
         {/* Bottom Navigation Bar */}
@@ -222,10 +292,13 @@ const App: React.FC = () => {
               <History className="w-6 h-6" />
               <span className="text-[10px] font-medium">历史</span>
             </button>
-            <div className="w-full h-full flex items-center justify-center">
-                 {/* Spacer or Settings */}
-                 <div className="w-6" />
-            </div>
+            <button 
+              onClick={() => setView('settings')}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${view === 'settings' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Settings className="w-6 h-6" />
+              <span className="text-[10px] font-medium">设置</span>
+            </button>
           </div>
         </div>
 
