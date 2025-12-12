@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, Check, Loader2, Calculator, Plus, Trash2, AlertCircle } from 'lucide-react';
-import { analyzeShoeImage } from '../services/geminiService';
+import React, { useState, useRef } from 'react';
+import { Camera, Upload, Check, Plus, Trash2 } from 'lucide-react';
 import { StockItem, StockVariant } from '../types';
 
 interface StockFormProps {
@@ -10,7 +9,6 @@ interface StockFormProps {
 
 export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -28,24 +26,13 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
   const totalQuantity = variants.reduce((sum, v) => sum + (v.quantity || 0), 0);
   const calculatedTotalCost = totalQuantity * (Number(unitCost) || 0);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = async () => {
+      reader.onloadend = () => {
         const base64 = reader.result as string;
         setImagePreview(base64);
-        
-        // Auto-analyze with Gemini
-        setIsAnalyzing(true);
-        try {
-          const analysis = await analyzeShoeImage(base64);
-          if (analysis.name) setName(analysis.name);
-          if (analysis.category) setCategory(analysis.category);
-          if (analysis.description) setDescription(analysis.description);
-        } finally {
-          setIsAnalyzing(false);
-        }
       };
       reader.readAsDataURL(file);
     }
@@ -128,7 +115,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
               <div className="text-slate-400 flex flex-col items-center">
                 <Upload className="w-8 h-8 mb-2" />
                 <p className="text-sm font-medium">点击上传或拍照</p>
-                <p className="text-xs mt-1">AI 将自动识别详情</p>
+                <p className="text-xs mt-1">记录商品外观</p>
               </div>
             )}
             <input 
@@ -138,15 +125,8 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
               capture="environment"
               className="hidden" 
               onChange={handleFileChange}
-              required={!imagePreview}
             />
           </div>
-          {isAnalyzing && (
-            <div className="mt-3 flex items-center gap-2 text-indigo-600 text-sm animate-pulse">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>正在使用 AI 分析图片...</span>
-            </div>
-          )}
         </div>
 
         {/* Basic Info */}
