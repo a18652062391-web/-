@@ -1,47 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { LayoutDashboard, Package, PlusCircle, History, Settings, Trash2, Download, Upload, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Package, PlusCircle, History, Settings, Trash2, Download, Upload, Smartphone } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { InventoryList } from './components/InventoryList';
 import { StockForm } from './components/StockForm';
 import { SaleModal } from './components/SaleModal';
 import { StockItem, SaleRecord, AppView, DashboardStats } from './types';
 
-// Initial data with variants (Used only if local storage is empty)
-const INITIAL_STOCKS: StockItem[] = [
-  {
-    id: '1',
-    name: '经典小白鞋',
-    category: '运动鞋',
-    description: '基础款百搭白色运动鞋',
-    initialQuantity: 10,
-    currentQuantity: 8,
-    unitCost: 150,
-    totalCost: 1500,
-    purchaseDate: new Date().toISOString(),
-    imageUrl: 'https://picsum.photos/300/300?random=1',
-    variants: [
-      { id: 'v1', size: '37', color: '白色', quantity: 3 },
-      { id: 'v2', size: '38', color: '白色', quantity: 1 }, // Low stock example
-      { id: 'v3', size: '39', color: '白色', quantity: 4 }
-    ]
-  },
-  {
-    id: '2',
-    name: '专业跑鞋 X',
-    category: '运动鞋',
-    description: '高性能长跑专用鞋',
-    initialQuantity: 5,
-    currentQuantity: 5,
-    unitCost: 280,
-    totalCost: 1400,
-    purchaseDate: new Date().toISOString(),
-    imageUrl: 'https://picsum.photos/300/300?random=2',
-    variants: [
-      { id: 'v4', size: '42', color: '黑红', quantity: 2 },
-      { id: 'v5', size: '43', color: '黑红', quantity: 3 }
-    ]
-  }
-];
+// Initial data: Empty for production use
+const INITIAL_STOCKS: StockItem[] = [];
 
 const STORAGE_KEYS = {
   STOCKS: 'shoe-store-stocks',
@@ -140,12 +106,12 @@ const App: React.FC = () => {
   };
 
   const handleResetData = () => {
-    if (confirm('确定要清空所有数据吗？此操作无法撤销，数据将恢复到初始测试状态。')) {
+    if (confirm('确定要清空所有数据吗？此操作无法撤销。')) {
       localStorage.removeItem(STORAGE_KEYS.STOCKS);
       localStorage.removeItem(STORAGE_KEYS.SALES);
-      setStocks(INITIAL_STOCKS);
+      setStocks([]);
       setSales([]);
-      alert('数据已重置');
+      alert('数据已清空');
       setView('dashboard');
     }
   };
@@ -295,11 +261,11 @@ const App: React.FC = () => {
                {/* Data Backup Section */}
                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden mb-6">
                  <div className="p-6">
-                   <h3 className="font-semibold text-lg text-slate-900 mb-2">数据备份与恢复</h3>
-                   <div className="bg-amber-50 p-3 rounded-lg flex items-start gap-3 mb-6">
-                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                     <p className="text-amber-800 text-xs leading-relaxed">
-                       重要提示：数据当前仅保存在您的浏览器中。清除缓存会导致数据丢失。请定期下载备份文件以防意外。
+                   <h3 className="font-semibold text-lg text-slate-900 mb-2">数据管理</h3>
+                   <div className="bg-blue-50 p-3 rounded-lg flex items-start gap-3 mb-6">
+                     <Smartphone className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                     <p className="text-blue-800 text-xs leading-relaxed">
+                       数据存储在您的手机上。建议定期备份数据，以便在更换手机时恢复记录。
                      </p>
                    </div>
 
@@ -336,7 +302,7 @@ const App: React.FC = () => {
                  <div className="p-6">
                    <h3 className="font-semibold text-lg text-slate-900 mb-2">危险区域</h3>
                    <p className="text-slate-500 text-sm mb-4">
-                     重置将清空所有数据并恢复到初始演示状态。
+                     删除所有库存和销售记录。
                    </p>
                    
                    <button 
@@ -344,14 +310,13 @@ const App: React.FC = () => {
                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-medium hover:bg-red-100 transition-colors"
                    >
                      <Trash2 className="w-5 h-5" />
-                     清空所有数据 (重置)
+                     清空所有数据
                    </button>
                  </div>
                </div>
                
                <div className="mt-8 text-center text-xs text-slate-400">
-                 <p>鞋店管家 v1.0.2</p>
-                 <p className="mt-1">Designed for Small Business</p>
+                 <p>鞋店管家 v1.1.0</p>
                </div>
              </div>
           )}

@@ -59,12 +59,39 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
   };
 
   const updateVariant = (id: string, field: keyof StockVariant, value: string | number) => {
+    let finalValue = value;
+    
+    // Logic to prevent leading zeros for quantity
+    if (field === 'quantity') {
+       if (value === '') {
+         finalValue = 0;
+       } else {
+         finalValue = parseInt(value.toString()) || 0;
+       }
+    }
+
     setVariants(variants.map(v => {
       if (v.id === id) {
-        return { ...v, [field]: value };
+        return { ...v, [field]: finalValue };
       }
       return v;
     }));
+  };
+  
+  // Helper to handle cost input without leading zeros
+  const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow empty string
+    if (val === '') {
+      setUnitCost('');
+      return;
+    }
+    // Prevent "05", allow "0.5" or "5"
+    if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
+      setUnitCost(val.replace(/^0+/, ''));
+    } else {
+      setUnitCost(val);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -161,7 +188,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
                 min="0.01"
                 step="0.01"
                 value={unitCost}
-                onChange={e => setUnitCost(e.target.value)}
+                onChange={handleCostChange}
                 placeholder="0.00"
                 className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
@@ -216,8 +243,8 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
                   <input 
                     type="number" 
                     min="1"
-                    value={variant.quantity}
-                    onChange={(e) => updateVariant(variant.id, 'quantity', parseInt(e.target.value) || 0)}
+                    value={variant.quantity.toString()} // Convert to string for input
+                    onChange={(e) => updateVariant(variant.id, 'quantity', e.target.value)}
                     className="w-full px-2 py-1.5 rounded-md border border-slate-200 text-sm focus:border-indigo-500 focus:outline-none text-center"
                     required
                   />

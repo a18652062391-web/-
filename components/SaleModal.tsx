@@ -84,9 +84,18 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
   };
 
   const updateEntry = (id: string, field: keyof PriceEntry, value: string) => {
+    let finalValue = value;
+
+    // Logic to prevent leading zeros "05" -> "5", but allow "0." or empty
+    if (field === 'quantity' || field === 'price') {
+       if (value.length > 1 && value.startsWith('0') && value[1] !== '.') {
+         finalValue = value.replace(/^0+/, '');
+       }
+    }
+
     setEntries(entries.map(e => {
       if (e.id === id) {
-        return { ...e, [field]: value };
+        return { ...e, [field]: finalValue };
       }
       return e;
     }));
