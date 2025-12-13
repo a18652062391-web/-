@@ -9,6 +9,7 @@ interface StockFormProps {
 
 export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isProcessingImg, setIsProcessingImg] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -26,13 +27,52 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
   const totalQuantity = variants.reduce((sum, v) => sum + (v.quantity || 0), 0);
   const calculatedTotalCost = totalQuantity * (Number(unitCost) || 0);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Compress image helper
+  const compressImage = (base64Str: string, maxWidth = 800, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+          resolve(base64Str); // Fallback
+        }
+      };
+      img.onerror = () => resolve(base64Str); // Fallback
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsProcessingImg(true);
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64 = reader.result as string;
-        setImagePreview(base64);
+        try {
+          // Compress the image before setting state
+          const compressed = await compressImage(base64);
+          setImagePreview(compressed);
+        } catch (err) {
+          console.error("Compression failed", err);
+          setImagePreview(base64);
+        } finally {
+          setIsProcessingImg(false);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -126,7 +166,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
         <div className="p-6 border-b border-slate-100">
           <label className="block text-sm font-medium text-slate-700 mb-2">鞋子照片</label>
           <div 
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => !isProcessingImg && fileInputRef.current?.click()}
             className="relative cursor-pointer group aspect-video rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center hover:border-indigo-400 transition-colors overflow-hidden"
           >
             {imagePreview ? (
@@ -141,7 +181,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
             ) : (
               <div className="text-slate-400 flex flex-col items-center">
                 <Upload className="w-8 h-8 mb-2" />
-                <p className="text-sm font-medium">点击上传或拍照</p>
+                <p className="text-sm font-medium">{isProcessingImg ? "处理中..." : "点击上传或拍照"}</p>
                 <p className="text-xs mt-1">记录商品外观</p>
               </div>
             )}
@@ -152,6 +192,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
               capture="environment"
               className="hidden" 
               onChange={handleFileChange}
+              disabled={isProcessingImg}
             />
           </div>
         </div>
@@ -290,9 +331,10 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
           </button>
           <button 
             type="submit" 
-            className="flex-1 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+            disabled={isProcessingImg}
+            className={`flex-1 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 ${isProcessingImg ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            <Check className="w-5 h-5" /> 保存库存
+            <Check className="w-5 h-5" /> {isProcessingImg ? '处理中...' : '保存库存'}
           </button>
         </div>
       </form>
