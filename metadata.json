@@ -1,6 +1,6 @@
 {
   "name": "鞋店管家",
-  "description": "专为鞋类零售商打造的智能库存和销售管理应用。通过 AI 识别鞋子，轻松追踪库存、记录销售并分析利润。",
+  "description": "专为鞋类零售商打造的库存和销售管理应用。轻松拍照、追踪库存、记录销售并分析利润。",
   "requestFramePermissions": [
     "camera"
   ]
