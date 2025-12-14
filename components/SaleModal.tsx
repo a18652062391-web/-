@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingBag, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { X, ShoppingBag, Plus, Trash2, AlertCircle, CheckCircle, Copy, Share } from 'lucide-react';
 import { StockItem, SaleRecord } from '../types';
 
 interface SaleModalProps {
@@ -11,7 +11,7 @@ interface SaleModalProps {
 
 interface PriceEntry {
   id: string;
-  variantId: string; // Required now
+  variantId: string;
   quantity: number | string; 
   price: number | string;
 }
@@ -19,6 +19,8 @@ interface PriceEntry {
 export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, onConfirmSale }) => {
   const [entries, setEntries] = useState<PriceEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [lastRecords, setLastRecords] = useState<SaleRecord[]>([]);
 
   // Initialize with one default entry when modal opens
   useEffect(() => {
@@ -33,6 +35,8 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
         price: Math.ceil(stock.unitCost * 1.3) 
       }]);
       setError(null);
+      setIsCompleted(false);
+      setLastRecords([]);
     }
   }, [stock, isOpen]);
 
@@ -49,14 +53,12 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
   
   // Validation logic
   const validateStock = () => {
-    // Group requested quantities by variant
     const requestedStock: Record<string, number> = {};
     for (const entry of entries) {
       if (!entry.variantId) continue;
       requestedStock[entry.variantId] = (requestedStock[entry.variantId] || 0) + getNumber(entry.quantity);
     }
 
-    // Check against actual stock
     for (const [vId, reqQty] of Object.entries(requestedStock)) {
       const variant = stock.variants?.find(v => v.id === vId);
       if (!variant) return false;
@@ -85,20 +87,12 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
 
   const updateEntry = (id: string, field: keyof PriceEntry, value: string) => {
     let finalValue = value;
-
-    // Logic to prevent leading zeros "05" -> "5", but allow "0." or empty
     if (field === 'quantity' || field === 'price') {
        if (value.length > 1 && value.startsWith('0') && value[1] !== '.') {
          finalValue = value.replace(/^0+/, '');
        }
     }
-
-    setEntries(entries.map(e => {
-      if (e.id === id) {
-        return { ...e, [field]: finalValue };
-      }
-      return e;
-    }));
+    setEntries(entries.map(e => e.id === id ? { ...e, [field]: finalValue } : e));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -109,9 +103,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
       return;
     }
 
-    // Filter out entries with 0 quantity or no variant selected
     const validEntries = entries.filter(e => getNumber(e.quantity) > 0 && e.variantId);
-
     if (validEntries.length === 0) {
       setError("请填写有效的销售信息。");
       return;
@@ -137,10 +129,83 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
     });
 
     onConfirmSale(newRecords);
+    setLastRecords(newRecords);
+    setIsCompleted(true); // Switch to receipt view
   };
 
-  const availableVariants = stock.variants?.filter(v => v.quantity > 0) || [];
+  const generateReceiptText = () => {
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+    let text = `【销售小票】\n时间: ${dateStr}\n商品: ${stock.name}\n----------------\n`;
+    
+    let grandTotal = 0;
+    lastRecords.forEach(r => {
+      text += `${r.size}码/${r.color} x ${r.quantitySold}  ¥${r.salePricePerUnit}\n`;
+      grandTotal += r.totalRevenue;
+    });
+    
+    text += `----------------\n总计: ¥${grandTotal}\n谢谢惠顾！`;
+    return text;
+  };
 
+  const copyReceipt = () => {
+    const text = generateReceiptText();
+    navigator.clipboard.writeText(text).then(() => {
+      alert('小票已复制，可前往微信粘贴发送');
+    });
+  };
+
+  // --- Success / Receipt View ---
+  if (isCompleted) {
+    const totalRev = lastRecords.reduce((sum, r) => sum + r.totalRevenue, 0);
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="p-8 flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4 text-emerald-600">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">销售成功！</h3>
+            <p className="text-slate-500 text-sm mb-6">库存已扣除，账目已记录。</p>
+            
+            <div className="w-full bg-slate-50 p-4 rounded-xl border border-slate-100 border-dashed mb-6 relative">
+               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-r border-slate-200"></div>
+               <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-l border-slate-200"></div>
+               
+               <div className="text-left space-y-2 text-sm font-mono text-slate-600">
+                  <div className="flex justify-between font-bold text-slate-800 border-b border-slate-200 pb-2 mb-2">
+                    <span>{stock.name}</span>
+                    <span>{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </div>
+                  {lastRecords.map((r, idx) => (
+                    <div key={idx} className="flex justify-between">
+                      <span>{r.size}/{r.color} x{r.quantitySold}</span>
+                      <span>¥{r.totalRevenue}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-lg text-slate-900">
+                    <span>总计</span>
+                    <span>¥{totalRev}</span>
+                  </div>
+               </div>
+            </div>
+
+            <div className="flex gap-3 w-full">
+              <button onClick={copyReceipt} className="flex-1 py-3 bg-indigo-50 text-indigo-600 font-bold rounded-xl hover:bg-indigo-100 transition flex justify-center items-center gap-2">
+                <Copy className="w-4 h-4" /> 复制小票
+              </button>
+              <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition">
+                完成
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Normal Input Form View ---
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose}></div>

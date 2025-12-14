@@ -1,13 +1,15 @@
-import React, { useState, useRef } from 'react';
-import { Camera, Upload, Check, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, Upload, Check, Plus, Trash2, ArrowLeft, ImageOff } from 'lucide-react';
 import { StockItem, StockVariant } from '../types';
 
 interface StockFormProps {
+  initialData?: StockItem; // Optional prop for edit mode
   onAddStock: (item: StockItem) => void;
+  onUpdateStock?: (item: StockItem) => void;
   onCancel: () => void;
 }
 
-export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) => {
+export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, onUpdateStock, onCancel }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isProcessingImg, setIsProcessingImg] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -18,17 +20,29 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
   const [description, setDescription] = useState('');
   const [unitCost, setUnitCost] = useState<number | string>('');
   
-  // Variants State
   const [variants, setVariants] = useState<StockVariant[]>([
     { id: crypto.randomUUID(), size: '', color: '', quantity: 1 }
   ]);
 
-  // Derived State
-  const totalQuantity = variants.reduce((sum, v) => sum + (v.quantity || 0), 0);
+  // Load initial data if editing
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name);
+      setCategory(initialData.category || '');
+      setDescription(initialData.description || '');
+      setUnitCost(initialData.unitCost);
+      setImagePreview(initialData.imageUrl || null);
+      if (initialData.variants && initialData.variants.length > 0) {
+        setVariants(initialData.variants);
+      }
+    }
+  }, [initialData]);
+
+  const totalQuantity = variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0);
   const calculatedTotalCost = totalQuantity * (Number(unitCost) || 0);
 
-  // Compress image helper
-  const compressImage = (base64Str: string, maxWidth = 800, quality = 0.7): Promise<string> => {
+  // Aggressive Image Compression for LocalStorage
+  const compressImage = (base64Str: string, maxWidth = 600, quality = 0.6): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = base64Str;
@@ -37,6 +51,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
         let width = img.width;
         let height = img.height;
 
+        // Scale down keeping aspect ratio
         if (width > maxWidth) {
           height = Math.round((height * maxWidth) / width);
           width = maxWidth;
@@ -47,24 +62,30 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
+          // Compress strictly to jpeg
           resolve(canvas.toDataURL('image/jpeg', quality));
         } else {
-          resolve(base64Str); // Fallback
+          resolve(base64Str);
         }
       };
-      img.onerror = () => resolve(base64Str); // Fallback
+      img.onerror = () => resolve(base64Str);
     });
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Basic size check before processing (limit 10MB input)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('图片太大，请选择小一点的图片。');
+        return;
+      }
+
       setIsProcessingImg(true);
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
         try {
-          // Compress the image before setting state
           const compressed = await compressImage(base64);
           setImagePreview(compressed);
         } catch (err) {
@@ -79,7 +100,6 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
   };
 
   const handleAddVariant = () => {
-    // Copy size/color from previous entry for faster entry
     const lastVariant = variants[variants.length - 1];
     setVariants([
       ...variants, 
@@ -100,33 +120,19 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
 
   const updateVariant = (id: string, field: keyof StockVariant, value: string | number) => {
     let finalValue = value;
-    
-    // Logic to prevent leading zeros for quantity
     if (field === 'quantity') {
-       if (value === '') {
-         finalValue = 0;
-       } else {
-         finalValue = parseInt(value.toString()) || 0;
-       }
+       if (value === '') finalValue = 0;
+       else finalValue = parseInt(value.toString()) || 0;
     }
-
-    setVariants(variants.map(v => {
-      if (v.id === id) {
-        return { ...v, [field]: finalValue };
-      }
-      return v;
-    }));
+    setVariants(variants.map(v => v.id === id ? { ...v, [field]: finalValue } : v));
   };
   
-  // Helper to handle cost input without leading zeros
   const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    // Allow empty string
     if (val === '') {
       setUnitCost('');
       return;
     }
-    // Prevent "05", allow "0.5" or "5"
     if (val.length > 1 && val.startsWith('0') && val[1] !== '.') {
       setUnitCost(val.replace(/^0+/, ''));
     } else {
@@ -136,29 +142,42 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (totalQuantity === 0) return;
+    if (totalQuantity === 0) {
+      alert("请至少添加一件库存数量。");
+      return;
+    }
 
-    const newItem: StockItem = {
-      id: crypto.randomUUID(),
+    const itemData: StockItem = {
+      id: initialData ? initialData.id : crypto.randomUUID(), // Keep ID if editing
       name,
       category,
       description,
       imageUrl: imagePreview || undefined,
-      initialQuantity: totalQuantity,
-      currentQuantity: totalQuantity,
+      initialQuantity: initialData ? initialData.initialQuantity : totalQuantity, // Keep initial if editing
+      currentQuantity: totalQuantity, // Reset current based on variants
       unitCost: Number(unitCost),
       totalCost: calculatedTotalCost,
-      purchaseDate: new Date().toISOString(),
+      purchaseDate: initialData ? initialData.purchaseDate : new Date().toISOString(),
       variants: variants.map(v => ({...v, quantity: Number(v.quantity)}))
     };
-    onAddStock(newItem);
+
+    if (initialData && onUpdateStock) {
+      onUpdateStock(itemData);
+    } else {
+      onAddStock(itemData);
+    }
   };
 
   return (
     <div className="pb-20">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">新增库存</h1>
-        <p className="text-slate-500">登记新进货鞋子的尺码和颜色。</p>
+      <header className="mb-6 flex items-center gap-2">
+        <button onClick={onCancel} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-500">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">{initialData ? '编辑库存' : '新增库存'}</h1>
+          <p className="text-slate-500 text-sm">{initialData ? '修改商品信息或调整库存' : '登记新进货鞋子'}</p>
+        </div>
       </header>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -177,19 +196,25 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
                     <Camera className="w-5 h-5" /> 更换照片
                   </span>
                 </div>
+                <button 
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setImagePreview(null); }}
+                  className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-full text-slate-600 shadow-sm z-10"
+                >
+                  <ImageOff className="w-4 h-4" />
+                </button>
               </>
             ) : (
               <div className="text-slate-400 flex flex-col items-center">
                 <Upload className="w-8 h-8 mb-2" />
-                <p className="text-sm font-medium">{isProcessingImg ? "处理中..." : "点击上传或拍照"}</p>
-                <p className="text-xs mt-1">记录商品外观</p>
+                <p className="text-sm font-medium">{isProcessingImg ? "压缩处理中..." : "点击上传或拍照"}</p>
+                <p className="text-xs mt-1">建议横向拍摄</p>
               </div>
             )}
             <input 
               ref={fileInputRef}
               type="file" 
               accept="image/*" 
-              capture="environment"
               className="hidden" 
               onChange={handleFileChange}
               disabled={isProcessingImg}
@@ -242,13 +267,13 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
         <div className="p-6 bg-slate-50/50">
           <div className="flex justify-between items-center mb-3">
              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
-               库存明细 (尺码 & 颜色)
+               库存明细
                <span className="text-xs font-normal text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">总计: {totalQuantity} 双</span>
              </label>
              <button 
                type="button" 
                onClick={handleAddVariant}
-               className="text-indigo-600 text-xs font-medium flex items-center gap-1 hover:text-indigo-700"
+               className="text-indigo-600 text-xs font-medium flex items-center gap-1 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md"
              >
                <Plus className="w-4 h-4" /> 添加规格
              </button>
@@ -256,14 +281,13 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
           
           <div className="space-y-3">
             {variants.map((variant, index) => (
-              <div key={variant.id} className="flex gap-2 items-start bg-white p-3 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-left-2">
+              <div key={variant.id} className="flex gap-2 items-start bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex-1">
                   <label className="text-[10px] text-slate-400 mb-1 block">尺码</label>
                   <input 
                     type="text" 
                     value={variant.size}
                     onChange={(e) => updateVariant(variant.id, 'size', e.target.value)}
-                    placeholder="如: 42"
                     className="w-full px-2 py-1.5 rounded-md border border-slate-200 text-sm focus:border-indigo-500 focus:outline-none"
                     required
                   />
@@ -274,7 +298,6 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
                     type="text" 
                     value={variant.color}
                     onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
-                    placeholder="如: 黑白"
                     className="w-full px-2 py-1.5 rounded-md border border-slate-200 text-sm focus:border-indigo-500 focus:outline-none"
                     required
                   />
@@ -283,8 +306,8 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
                   <label className="text-[10px] text-slate-400 mb-1 block">数量</label>
                   <input 
                     type="number" 
-                    min="1"
-                    value={variant.quantity.toString()} // Convert to string for input
+                    min="0"
+                    value={variant.quantity.toString()}
                     onChange={(e) => updateVariant(variant.id, 'quantity', e.target.value)}
                     className="w-full px-2 py-1.5 rounded-md border border-slate-200 text-sm focus:border-indigo-500 focus:outline-none text-center"
                     required
@@ -316,7 +339,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
           </div>
           
           <div className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-slate-700 mb-4">
-             <span className="text-sm font-medium">总进货成本</span>
+             <span className="text-sm font-medium">总库存价值</span>
              <span className="font-bold text-lg">¥{calculatedTotalCost.toFixed(2)}</span>
           </div>
         </div>
@@ -334,7 +357,7 @@ export const StockForm: React.FC<StockFormProps> = ({ onAddStock, onCancel }) =>
             disabled={isProcessingImg}
             className={`flex-1 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 ${isProcessingImg ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            <Check className="w-5 h-5" /> {isProcessingImg ? '处理中...' : '保存库存'}
+            <Check className="w-5 h-5" /> {initialData ? '保存修改' : '确认添加'}
           </button>
         </div>
       </form>

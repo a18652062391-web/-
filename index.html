@@ -10,30 +10,51 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#ffffff" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
     <title>鞋店管家</title>
     
     <!-- Using Tailwind CDN for simplicity in this setup -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      /* --- Native App Optimization --- */
+      body {
+        /* Disable text selection like a native app */
+        -webkit-user-select: none;
+        user-select: none;
+        /* Remove tap highlight color on mobile */
+        -webkit-tap-highlight-color: transparent;
+        /* Prevent elastic scrolling/overscroll */
+        overscroll-behavior-y: none;
+      }
+
+      /* Re-enable text selection for inputs so users can edit text */
+      input, textarea {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
       /* Custom scrollbar for webkit */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 4px; /* Thinner scrollbar */
+        height: 4px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f5f9;
+        background: transparent;
       }
       ::-webkit-scrollbar-thumb {
         background: #cbd5e1;
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
+        border-radius: 4px;
       }
       
-      /* Safe area padding for iPhones with notch */
+      /* Safe area padding for iPhones with notch and Android edge-to-edge */
       .pb-safe {
         padding-bottom: env(safe-area-inset-bottom);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top);
       }
     </style>
   <script type="importmap">
