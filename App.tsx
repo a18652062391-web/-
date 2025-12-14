@@ -6,6 +6,11 @@ import { StockForm } from './components/StockForm';
 import { SaleModal } from './components/SaleModal';
 import { StockItem, SaleRecord, AppView, DashboardStats } from './types';
 
+// --- Safe ID Generator (Compatible with old Android) ---
+export const generateId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+};
+
 // Initial data: Empty for production use
 const INITIAL_STOCKS: StockItem[] = [];
 
@@ -455,13 +460,13 @@ const App: React.FC = () => {
                    </button>
                  </div>
                </div>
-               <div className="mt-8 text-center text-xs text-slate-400"><p>鞋店管家 v1.5.0 (全能版)</p></div>
+               <div className="mt-8 text-center text-xs text-slate-400"><p>鞋店管家 v1.6.0 (兼容优化版)</p></div>
              </div>
           )}
         </main>
         
-        {/* Bottom Nav */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-40 pb-safe">
+        {/* Bottom Nav - REMOVED BACKDROP BLUR for compatibility */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 pb-safe">
           <div className="max-w-4xl mx-auto flex justify-around items-center h-16 px-2">
             <button onClick={() => navigateTo('dashboard')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${view === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}>
               <LayoutDashboard className="w-6 h-6" /><span className="text-[10px] font-medium">概览</span>

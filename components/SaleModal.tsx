@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, Plus, Trash2, AlertCircle, CheckCircle, Copy, Share } from 'lucide-react';
 import { StockItem, SaleRecord } from '../types';
+import { generateId } from '../App';
 
 interface SaleModalProps {
   stock: StockItem | null;
@@ -29,7 +30,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
       const firstAvailableVariant = stock.variants?.find(v => v.quantity > 0);
       
       setEntries([{ 
-        id: crypto.randomUUID(), 
+        id: generateId(), 
         variantId: firstAvailableVariant?.id || '',
         quantity: 1, 
         price: Math.ceil(stock.unitCost * 1.3) 
@@ -72,7 +73,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
   const handleAddEntry = () => {
     const lastEntry = entries[entries.length - 1];
     setEntries([...entries, { 
-      id: crypto.randomUUID(), 
+      id: generateId(), 
       variantId: lastEntry ? lastEntry.variantId : '',
       quantity: 1, 
       price: lastEntry ? lastEntry.price : Math.ceil(stock.unitCost * 1.3)
@@ -115,7 +116,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
       const variant = stock.variants?.find(v => v.id === entry.variantId);
       
       return {
-        id: crypto.randomUUID(),
+        id: generateId(),
         stockId: stock.id,
         variantId: entry.variantId,
         size: variant?.size || 'Unknown',
@@ -160,7 +161,8 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
     const totalRev = lastRecords.reduce((sum, r) => sum + r.totalRevenue, 0);
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
+        {/* Changed from backdrop-blur to solid semi-transparent black for compatibility */}
+        <div className="absolute inset-0 bg-black/60" onClick={onClose}></div>
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
           <div className="p-8 flex flex-col items-center text-center">
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4 text-emerald-600">
@@ -208,7 +210,8 @@ export const SaleModal: React.FC<SaleModalProps> = ({ stock, isOpen, onClose, on
   // --- Normal Input Form View ---
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose}></div>
+      {/* Changed from backdrop-blur to solid semi-transparent black for compatibility */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
           <h3 className="font-bold text-slate-800">记录销售</h3>

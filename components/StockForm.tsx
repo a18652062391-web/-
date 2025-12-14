@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Check, Plus, Trash2, ArrowLeft, ImageOff } from 'lucide-react';
 import { StockItem, StockVariant } from '../types';
+import { generateId } from '../App';
 
 interface StockFormProps {
   initialData?: StockItem; // Optional prop for edit mode
@@ -21,7 +22,7 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
   const [unitCost, setUnitCost] = useState<number | string>('');
   
   const [variants, setVariants] = useState<StockVariant[]>([
-    { id: crypto.randomUUID(), size: '', color: '', quantity: 1 }
+    { id: generateId(), size: '', color: '', quantity: 1 }
   ]);
 
   // Load initial data if editing
@@ -104,7 +105,7 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
     setVariants([
       ...variants, 
       { 
-        id: crypto.randomUUID(), 
+        id: generateId(), 
         size: lastVariant ? lastVariant.size : '', 
         color: lastVariant ? lastVariant.color : '', 
         quantity: 1 
@@ -148,7 +149,7 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
     }
 
     const itemData: StockItem = {
-      id: initialData ? initialData.id : crypto.randomUUID(), // Keep ID if editing
+      id: initialData ? initialData.id : generateId(), // Keep ID if editing
       name,
       category,
       description,
