@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Upload, Check, Plus, Trash2, ArrowLeft, ImageOff } from 'lucide-react';
+import { Camera as CameraIcon, Upload, Check, Plus, Trash2, ArrowLeft, ImageOff } from 'lucide-react';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { StockItem, StockVariant } from '../types';
 import { generateId } from '../App';
 
@@ -42,61 +43,30 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
   const totalQuantity = variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0);
   const calculatedTotalCost = totalQuantity * (Number(unitCost) || 0);
 
-  // Aggressive Image Compression for LocalStorage
-  const compressImage = (base64Str: string, maxWidth = 600, quality = 0.6): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = base64Str;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+  // Native Camera / Gallery Handler
+  const handleImageSelect = async () => {
+    if (isProcessingImg) return;
+    
+    setIsProcessingImg(true);
+    try {
+      // Direct Native Camera Call
+      const image = await Camera.getPhoto({
+        quality: 60, // Moderate quality to save memory
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt, // Asks user: Camera or Photos?
+        width: 800, // Resize natively (efficient)
+      });
 
-        // Scale down keeping aspect ratio
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          // Compress strictly to jpeg
-          resolve(canvas.toDataURL('image/jpeg', quality));
-        } else {
-          resolve(base64Str);
-        }
-      };
-      img.onerror = () => resolve(base64Str);
-    });
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Basic size check before processing (limit 10MB input)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('图片太大，请选择小一点的图片。');
-        return;
+      if (image.dataUrl) {
+        setImagePreview(image.dataUrl);
       }
-
-      setIsProcessingImg(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        try {
-          const compressed = await compressImage(base64);
-          setImagePreview(compressed);
-        } catch (err) {
-          console.error("Compression failed", err);
-          setImagePreview(base64);
-        } finally {
-          setIsProcessingImg(false);
-        }
-      };
-      reader.readAsDataURL(file);
+    } catch (error) {
+      // User cancelled or plugin error
+      console.log('Camera cancelled or failed:', error);
+      // Optional: fallback to file input if needed, but for APK native is best.
+    } finally {
+      setIsProcessingImg(false);
     }
   };
 
@@ -149,13 +119,13 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
     }
 
     const itemData: StockItem = {
-      id: initialData ? initialData.id : generateId(), // Keep ID if editing
+      id: initialData ? initialData.id : generateId(),
       name,
       category,
       description,
       imageUrl: imagePreview || undefined,
-      initialQuantity: initialData ? initialData.initialQuantity : totalQuantity, // Keep initial if editing
-      currentQuantity: totalQuantity, // Reset current based on variants
+      initialQuantity: initialData ? initialData.initialQuantity : totalQuantity,
+      currentQuantity: totalQuantity, 
       unitCost: Number(unitCost),
       totalCost: calculatedTotalCost,
       purchaseDate: initialData ? initialData.purchaseDate : new Date().toISOString(),
@@ -186,15 +156,15 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
         <div className="p-6 border-b border-slate-100">
           <label className="block text-sm font-medium text-slate-700 mb-2">鞋子照片</label>
           <div 
-            onClick={() => !isProcessingImg && fileInputRef.current?.click()}
-            className="relative cursor-pointer group aspect-video rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center hover:border-indigo-400 transition-colors overflow-hidden"
+            onClick={handleImageSelect}
+            className="relative cursor-pointer group aspect-video rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center hover:border-indigo-400 transition-colors overflow-hidden active:bg-slate-100"
           >
             {imagePreview ? (
               <>
                 <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <span className="text-white font-medium flex items-center gap-2">
-                    <Camera className="w-5 h-5" /> 更换照片
+                    <CameraIcon className="w-5 h-5" /> 更换照片
                   </span>
                 </div>
                 <button 
@@ -208,18 +178,12 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
             ) : (
               <div className="text-slate-400 flex flex-col items-center">
                 <Upload className="w-8 h-8 mb-2" />
-                <p className="text-sm font-medium">{isProcessingImg ? "压缩处理中..." : "点击上传或拍照"}</p>
+                <p className="text-sm font-medium">{isProcessingImg ? "处理中..." : "点击拍照或上传"}</p>
                 <p className="text-xs mt-1">建议横向拍摄</p>
               </div>
             )}
-            <input 
-              ref={fileInputRef}
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              onChange={handleFileChange}
-              disabled={isProcessingImg}
-            />
+            {/* Fallback Input hidden */}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" />
           </div>
         </div>
 
