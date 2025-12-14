@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera as CameraIcon, Upload, Check, Plus, Trash2, ArrowLeft, ImageOff } from 'lucide-react';
+import { Camera as CameraIcon, Upload, Check, Plus, Trash2, ArrowLeft, ImageOff, Image as ImageIcon } from 'lucide-react';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 import { StockItem, StockVariant } from '../types';
 import { generateId } from '../App';
 
@@ -43,31 +44,62 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
   const totalQuantity = variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0);
   const calculatedTotalCost = totalQuantity * (Number(unitCost) || 0);
 
-  // Native Camera / Gallery Handler
+  // Fallback: Handle standard file input change (when native camera fails)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Simple file read, no need to show global loading state that locks UI
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.onerror = () => {
+        alert("图片读取失败");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Logic to handle image selection based on platform
   const handleImageSelect = async () => {
+    // 1. Web / Preview Mode: Direct file input to avoid "Processing..." hang
+    if (!Capacitor.isNativePlatform()) {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    // 2. Native App Mode: Use Capacitor Camera
     if (isProcessingImg) return;
     
     setIsProcessingImg(true);
     try {
-      // Direct Native Camera Call
       const image = await Camera.getPhoto({
-        quality: 60, // Moderate quality to save memory
+        quality: 60,
         allowEditing: false,
         resultType: CameraResultType.DataUrl,
-        source: CameraSource.Prompt, // Asks user: Camera or Photos?
-        width: 800, // Resize natively (efficient)
+        source: CameraSource.Prompt,
+        width: 600, // Reduced resolution for stability
+        promptLabelHeader: '上传照片',
+        promptLabelPhoto: '从相册选择',
+        promptLabelPicture: '拍照',
+        promptLabelCancel: '取消'
       });
 
       if (image.dataUrl) {
         setImagePreview(image.dataUrl);
       }
     } catch (error) {
-      // User cancelled or plugin error
+      // If user cancelled or camera failed, fallback silently or log
       console.log('Camera cancelled or failed:', error);
-      // Optional: fallback to file input if needed, but for APK native is best.
     } finally {
       setIsProcessingImg(false);
     }
+  };
+
+  // Explicit fallback button click
+  const handleForceFileUpload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fileInputRef.current?.click();
   };
 
   const handleAddVariant = () => {
@@ -155,6 +187,7 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
         {/* Image Upload Section */}
         <div className="p-6 border-b border-slate-100">
           <label className="block text-sm font-medium text-slate-700 mb-2">鞋子照片</label>
+          
           <div 
             onClick={handleImageSelect}
             className="relative cursor-pointer group aspect-video rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center hover:border-indigo-400 transition-colors overflow-hidden active:bg-slate-100"
@@ -182,8 +215,27 @@ export const StockForm: React.FC<StockFormProps> = ({ initialData, onAddStock, o
                 <p className="text-xs mt-1">建议横向拍摄</p>
               </div>
             )}
-            {/* Fallback Input hidden */}
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" />
+            
+            {/* Hidden Input */}
+            <input 
+              ref={fileInputRef} 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={handleFileChange}
+            />
+          </div>
+
+          {/* Explicit Backup Button for Web/Failures */}
+          <div className="mt-3 text-center">
+             <button 
+               type="button"
+               onClick={handleForceFileUpload}
+               className="text-xs text-indigo-600 font-medium flex items-center justify-center gap-1 hover:underline mx-auto"
+             >
+               <ImageIcon className="w-3 h-3" />
+               无法拍照？点此直接选择文件
+             </button>
           </div>
         </div>
 
